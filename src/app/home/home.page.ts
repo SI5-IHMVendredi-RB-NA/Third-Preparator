@@ -21,14 +21,15 @@ export class HomePage {
   speech = new Speech();
   mic: any;
   micToggle =  false;
-  rushHour: boolean = false;
+  rushHour = false;
   vagueDictionary = {};
   idVague = 0;
   textPerVague = {};
   MAX_VAGUES_ORDERS = 5;
+  rushMode = false;
 
   constructor(private http: HttpClient, private sseService: SseService, private cdr: ChangeDetectorRef,
-    private localNotification: LocalNotifications, private plt: Platform) {
+              private localNotification: LocalNotifications, private plt: Platform) {
     // let source = new EventSource('http://localhost:9428/api/repas/sse');
     // source.addEventListener('message', aString => console.log(aString.data), false);
    /*this.tmp = this.http.get<Repas[]>('http://localhost:9428/api/repas');
@@ -59,7 +60,7 @@ export class HomePage {
       this.orders = v ;
     }); */
       this.sseService
-        .getServerSentEvent('http://10.189.174.180:9428/api/order/stream')
+        .getServerSentEvent('http://localhost.180:9428/api/order/stream')
         .subscribe(data => {
           console.log(data);
           const order = JSON.parse(data.data);
@@ -70,14 +71,20 @@ export class HomePage {
           console.log(this.vagues);
         });
 
-        this.sseService
-        .getServerSentEvent('http://10.189.174.180:9428/api/preparator/stream')
+
+      this.sseService
+        .getServerSentEvent('http://localhost:9428/api/preparator/stream')
         .subscribe(data => {
-          console.log(JSON.parse(data.data));
-          console.log('Vague terminée par ' + JSON.parse(data.data).name_preparator);
-          //const order = JSON.parse(data.data);
-          //this.orders.push(order.order);
-          this.scheduleNotification('Vague terminée par ' + JSON.parse(data.data).name_preparator);
+          console.log(data);
+          if (data.data === 'rush') {
+            console.log('RUSH');
+            this.rushMode = true;
+          }else {
+            console.log(JSON.parse(data.data));
+            console.log('Vague terminée par ' + JSON.parse(data.data).name_preparator);
+            this.scheduleNotification('Vague terminée par ' + JSON.parse(data.data).name_preparator);
+          }
+
         });
   }
 
@@ -88,7 +95,7 @@ export class HomePage {
       text: message,
       data: {page: 'myPage'},
       trigger: {in: 5, unit: ELocalNotificationTriggerUnit.SECOND}
-    })
+    });
   }
 
   async textToSpeech(){
@@ -206,9 +213,9 @@ export class HomePage {
       this.orders.splice(index, 1);
       this.cdr.detectChanges();
 
-      this.http.post<any[]>('http://10.189.174.180:9428/api/user', order).subscribe( v => {
+      this.http.post<any[]>('http://localhost.180:9428/api/user', order).subscribe( v => {
           console.log(v);
-        //this.orders = v ;
+        // this.orders = v ;
       });
   }
 
@@ -222,7 +229,7 @@ export class HomePage {
         this.http.post<any[]>('http://localhost:9428/api/user/vague', order).subscribe( v => {
           console.log(v);
         });
-      })
+      });
 
     this.http.post<any[]>('http://localhost:9428/api/preparator/vague', {id: 3, name: 'Kevin'}).subscribe( v => {
         console.log(v);
@@ -230,24 +237,24 @@ export class HomePage {
   }
 
   isRushHour(): void {
-    if(this.orders.length > this.MAX_VAGUES_ORDERS) {
+    if (this.orders.length > this.MAX_VAGUES_ORDERS) {
       this.rushHour = true;
       console.log('rushHour should be true');
-      console.log(this.rushHour)
-    } 
+      console.log(this.rushHour);
+    }
     else{
       this.rushHour = false;
       console.log('rushHour should be false');
-      console.log(this.rushHour)
+      console.log(this.rushHour);
     }
 }
 
 getEntreesPerVague(vague): string {
-    let result = "";
+    let result = '';
     console.log(this.vagueDictionary);
-    for(var key in this.vagueDictionary[vague.id]) {
+    for (const key in this.vagueDictionary[vague.id]) {
       const value = this.vagueDictionary[vague.id][key];
-      result += value + "x " + key + "\n";
+      result += value + 'x ' + key + '\n';
     }
     this.textPerVague[vague.id] = result;
     return result;
@@ -258,35 +265,35 @@ addOrderToDictionary(newOrder) {
     console.log(currentVague);
     currentVague.orders.forEach(order => {
       console.log(order === newOrder);
-      if(order === newOrder) {
-        if(this.vagueDictionary[currentVague.id] === undefined) {
+      if (order === newOrder) {
+        if (this.vagueDictionary[currentVague.id] === undefined) {
           this.vagueDictionary[currentVague.id] = {};
         }
-        if(this.vagueDictionary[currentVague.id][order.repas.entree + ""] === undefined) {
-          this.vagueDictionary[currentVague.id][order.repas.entree + ""] = 1;
+        if (this.vagueDictionary[currentVague.id][order.repas.entree + ''] === undefined) {
+          this.vagueDictionary[currentVague.id][order.repas.entree + ''] = 1;
         }
         else {
-          this.vagueDictionary[currentVague.id][order.repas.entree + ""] += 1;
+          this.vagueDictionary[currentVague.id][order.repas.entree + ''] += 1;
         }
       }
     });
-  
+
     console.log(this.vagueDictionary);
   }
 
   orderToVague(order) {
     console.log(order);
-    if(this.vagues.length === 0) {
-      let vague: Vague = new Vague;
+    if (this.vagues.length === 0) {
+      const vague: Vague = new Vague;
       vague.id = this.idVague;
       vague.orders = [];
       vague.orders.push(order);
       this.vagues.push(vague);
       console.log(this.vagues);
     }
-    else if(this.vagues[this.vagues.length - 1].orders.length === this.MAX_VAGUES_ORDERS) {
-      this.idVague+= 1;
-      let vague: Vague = new Vague;
+    else if (this.vagues[this.vagues.length - 1].orders.length === this.MAX_VAGUES_ORDERS) {
+      this.idVague += 1;
+      const vague: Vague = new Vague;
       vague.id = this.idVague;
       vague.orders = [];
       vague.orders.push(order);
