@@ -60,27 +60,22 @@ export class HomePage {
       this.orders = v ;
     }); */
       this.sseService
-        .getServerSentEvent('http://localhost.180:9428/api/order/stream')
+        .getServerSentEvent('http://10.189.174.180:9428/api/order/stream')
         .subscribe(data => {
-          console.log(data);
           const order = JSON.parse(data.data);
           this.orders.push(order.order);
           this.orderToVague(order.order);
           this.isRushHour();
           this.addOrderToDictionary(order.order);
-          console.log(this.vagues);
         });
 
 
       this.sseService
-        .getServerSentEvent('http://localhost:9428/api/preparator/stream')
+        .getServerSentEvent('http://10.189.174.180:9428/api/preparator/stream')
         .subscribe(data => {
-          console.log(data);
           if (data.data === 'rush') {
-            console.log('RUSH');
             this.rushMode = true;
           }else {
-            console.log(JSON.parse(data.data));
             console.log('Vague terminée par ' + JSON.parse(data.data).name_preparator);
             this.scheduleNotification('Vague terminée par ' + JSON.parse(data.data).name_preparator);
           }
@@ -123,7 +118,6 @@ export class HomePage {
               if (this.micToggle){
                   const array = Array.from(event.results);
                   const transcript = array[array.length - 1][0].transcript.replace(' ', '');
-                  console.log(transcript);
                   switch (transcript){
 
                       case 'repas':
@@ -135,7 +129,6 @@ export class HomePage {
                           break;
 
                       case 'entrée':
-                          console.log(order.repas);
                           this.speak(order.repas.entree);
                           break;
 
@@ -176,10 +169,74 @@ export class HomePage {
 
   }
 
+  async textToSpeechVagues(){
+
+    this.micToggle = !this.micToggle;
+    if (!this.micToggle){
+        this.mic.stop();
+        this.mic.onend = () => {
+            console.log('Stopped Mic on Click');
+        };
+    }else {
+        this.mic.start();
+        this.mic.onstart = () => {
+            console.log('Mics on');
+        };
+
+        this.mic.onresult = (event) => {
+          console.log('onResult');
+            /*const transcript = Array.from(event.results)
+                .map(result => result[0])
+                .map(result => result.transcript)
+                .join('');
+
+             */
+          if (this.micToggle){
+                const array = Array.from(event.results);
+                console.log(event.resultIndex);
+                const transcript = array[array.length - 1][0].transcript;
+                if (! (event.resultIndex == 1 && transcript == event.results[0][0].transcript)) {
+                  const tempTranscript = transcript.replace(' ', '');
+                  switch (tempTranscript){
+
+                    case 'entrée':
+                      let text = "";
+                      this.vagues[0].orders.forEach(order => {
+                        text += order.repas.entree + ', ';
+                      })
+                        text += ".";
+                        this.speak(text);
+                        break;
+
+                    case 'suivant':
+                      this.readyVague(this.vagues[0]);
+                        let text2 = "";
+                        this.vagues[0].orders.forEach(order => {
+                          text2 += order.repas.entree + ', ';
+                        })
+                        text2 += ".";
+                          this.speak(text2);
+                        break;
+
+                    case 'stop':
+                        this.micToggle = !this.micToggle;
+                        break;
+                    default: {
+                        // this.speak('Je n\'ai pas compris');
+                        // console.log('default');
+                    }
+                }
+                }
+
+            }
+
+        };
+    }
+}
+
 
  speak(textToSpeak: string){
       this.micToggle = !this.micToggle;
-      console.log('speaaaaak: ' + textToSpeak);
       /*this.speech.speak({
           text: textToSpeak,
       }).then(() => {
@@ -208,50 +265,40 @@ export class HomePage {
   }
 
   ready(order: Commande){
-      console.log(order);
       const index = this.orders.indexOf(order);
       this.orders.splice(index, 1);
       this.cdr.detectChanges();
 
-      this.http.post<any[]>('http://localhost.180:9428/api/user', order).subscribe( v => {
-          console.log(v);
+      this.http.post<any[]>('http://10.189.174.180:9428/api/user', order).subscribe( v => {
         // this.orders = v ;
       });
   }
 
   readyVague(vague) {
-    console.log(vague);
     const index = this.vagues.indexOf(vague);
     this.vagues.splice(index, 1);
     this.cdr.detectChanges();
 
     vague.orders.forEach(order => {
         this.http.post<any[]>('http://localhost:9428/api/user/vague', order).subscribe( v => {
-          console.log(v);
         });
       });
 
     this.http.post<any[]>('http://localhost:9428/api/preparator/vague', {id: 3, name: 'Kevin'}).subscribe( v => {
-        console.log(v);
       });
   }
 
   isRushHour(): void {
     if (this.orders.length > this.MAX_VAGUES_ORDERS) {
       this.rushHour = true;
-      console.log('rushHour should be true');
-      console.log(this.rushHour);
     }
     else{
       this.rushHour = false;
-      console.log('rushHour should be false');
-      console.log(this.rushHour);
     }
 }
 
 getEntreesPerVague(vague): string {
     let result = '';
-    console.log(this.vagueDictionary);
     for (const key in this.vagueDictionary[vague.id]) {
       const value = this.vagueDictionary[vague.id][key];
       result += value + 'x ' + key + '\n';
@@ -262,9 +309,7 @@ getEntreesPerVague(vague): string {
 
 addOrderToDictionary(newOrder) {
     const currentVague = this.vagues[this.vagues.length - 1];
-    console.log(currentVague);
     currentVague.orders.forEach(order => {
-      console.log(order === newOrder);
       if (order === newOrder) {
         if (this.vagueDictionary[currentVague.id] === undefined) {
           this.vagueDictionary[currentVague.id] = {};
@@ -277,19 +322,15 @@ addOrderToDictionary(newOrder) {
         }
       }
     });
-
-    console.log(this.vagueDictionary);
   }
 
   orderToVague(order) {
-    console.log(order);
     if (this.vagues.length === 0) {
       const vague: Vague = new Vague;
       vague.id = this.idVague;
       vague.orders = [];
       vague.orders.push(order);
       this.vagues.push(vague);
-      console.log(this.vagues);
     }
     else if (this.vagues[this.vagues.length - 1].orders.length === this.MAX_VAGUES_ORDERS) {
       this.idVague += 1;
@@ -302,8 +343,6 @@ addOrderToDictionary(newOrder) {
     else {
       this.vagues[this.vagues.length - 1].orders.push(order);
     }
-    console.log(this.vagues.length);
-    console.log(this.vagues[this.vagues.length - 1]);
   }
 
 }
